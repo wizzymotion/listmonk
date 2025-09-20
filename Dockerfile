@@ -1,5 +1,8 @@
 # ---------- build stage ----------
-FROM golang:1.22-alpine AS build
+FROM golang:1.24-alpine AS build
+# se quiser blindar ainda mais contra mudanças futuras do go.mod:
+# ENV GOTOOLCHAIN=auto
+
 RUN apk add --no-cache git build-base
 WORKDIR /src
 
@@ -20,7 +23,7 @@ RUN adduser -D -H -s /sbin/nologin listmonk && apk --no-cache add ca-certificate
 WORKDIR /app
 
 COPY --from=build /out/listmonk /app/listmonk
-# se existir no seu repo, copie o sample; caso não exista, remova a linha abaixo
+# se existir no seu fork, mantém; se não existir, remova a linha abaixo
 COPY config.toml.sample /app/config.toml
 
 USER listmonk
