@@ -1,26 +1,28 @@
-FROM alpine:latest
+# ---------- build stage ----------
+FROM golang:1.22-alpine AS build
+RUN apk add --no-cache git build-base
+WORKDIR /src
 
-# Install dependencies
-RUN apk --no-cache add ca-certificates tzdata shadow su-exec
+# cache de deps
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Set the working directory
-WORKDIR /listmonk
+# código
+COPY . .
 
-# Copy only the necessary files
-COPY listmonk .
-COPY config.toml.sample config.toml
+# compila o binário do listmonk
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -ldflags="-s -w" -o /out/listmonk ./cmd/listmonk
 
-# Copy the entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
+# ---------- runtime stage ----------
+FROM alpine:3.20
+RUN adduser -D -H -s /sbin/nologin listmonk && apk --no-cache add ca-certificates tzdata
+WORKDIR /app
 
-# Make the entrypoint script executable
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY --from=build /out/listmonk /app/listmonk
+# se existir no seu repo, copie o sample; caso não exista, remova a linha abaixo
+COPY config.toml.sample /app/config.toml
 
-# Expose the application port
+USER listmonk
 EXPOSE 9000
-
-# Set the entrypoint
-ENTRYPOINT ["docker-entrypoint.sh"]
-
-# Define the command to run the application
-CMD ["./listmonk"]
+ENTRYPOINT ["/app/listmonk"]
